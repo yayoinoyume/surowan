@@ -130,6 +130,7 @@ Passkey 是可选登录方式，**显式配置 `admin.public_url` 才启用**（
 | `POST /image/generations/resolve` | 只读：按当前图片配置把生成请求 body 解析成快照返回（预检），不创建任何记录、不提交生成 |
 | `POST /image/generations` / `POST /image/generations/:id/retry` | 以 `admin:<username>` actor 提交生成（body 含 `idempotency_key`，同键同内容重放不重新计费，同键不同内容 409）或重试已有 generation |
 | `PUT /image/config` | 图片功能启停与模型/凭据配置，`If-Match` revision 规则同其它配置写端点。`enabled: true` 时 body 必须带 `credentials`（名称 → 新明文；空对象保留已有 SecretRef，明文写入 key jar，`config.jsonc` 只保留 `{jar}` 引用）与 `models` 数组；可带 `credential_sources`（图片凭据名称 → 已配置的内置 OpenRouter Provider alias，服务端复用其 SecretRef，不返回密钥）。重复模型 ID 或缺失凭据引用在写入前拒绝（结构按 image 段 schema 校验，不合法返回 400 `invalid_body`）；`enabled: false` 删除整个 `image` 段并回收不再被引用的 jar 条目。写入经 reloader 原子应用，无需重启；响应 `{ enabled, apply }` |
+| `PUT /web-search/config` | body 只接受 `enabled`、`vendor`、`base_url`、`api_key`、`count`、`timeout_seconds`。`base_url: null` 删除覆盖；`api_key: string` 写入 key jar、`null` 删除引用并回收；标量按值比较，未变化不写，全部未变化时幂等成功且不重写文件。`vendor` 必须是已注册 id，数值越界在写入前返回 400 `invalid_body`；组合语义（如需要 key 的 vendor 缺 key、SearXNG 配了 key）由配置加载器校验，失败返回 422 `config_invalid` 且文件不变。`If-Match` 规则同其它写端点；成功响应 `{ revision, config, vendors, apply }`，其中 `api_key_configured` 只是布尔值，面板永远看不到密钥 |
 | `PUT /telegram` | 只接受 body `{ token: string \| null }`，其它字段返回 400 `invalid_body`。字符串写入 key jar，`config.jsonc` 只保留 `{jar}` 引用；`null` 删除 `telegram.token` 并回收不再被引用的 jar 条目；已经是 `null` 时幂等成功，不重写文件。`telegram` 段缺失时按 `TELEGRAM_DEFAULTS` 建段（`process_bot_messages: false`、`bucket_window_seconds: 15`、`chats: []`）。只改 token，不碰 Chats 或其它 `telegram.*` 字段，也不提供删除整段的写法。`If-Match` revision 规则同其它配置写端点：缺失 400 `revision_required`，过期 409 `config_conflict`；成功响应 `{ revision, status, telegram_section_present, token_configured, apply }`。明文在写入前注册进 `SecretStore`，响应、revision 冲突与 `config_invalid` 错误、reload 日志都不出现明文 |
 | `POST /restart` | 界面上的 “Restart now”。部署方未声明 `PLASTICWAN_SUPERVISED=1` 时返回 409 `restart_unsupported`；磁盘配置权限或内容校验失败时返回 422 `config_invalid` 且不退出；成功返回 202 `{ status: 'restarting' }`，随后走优雅关闭并以退出码 75（`EX_TEMPFAIL`）退出，由外部监督重新拉起 |
 | `POST /config/apply` | 重新读取 `config.jsonc` 并把热更新白名单字段应用到运行中的进程。成功返回 200 `{ status: 'applied', applied, restart_required, outside_serve, generation, active_hash, file_hash }`；失败返回 422 `{ error, message }`，此时 active 配置不变，错误记录在 `GET /config/status` 的 `last_error` |
@@ -421,3 +422,11 @@ Bot 管理员白名单不再是数据库表：迁移 `src/store/migrations/026_d
 `src/platform/image-models.ts` 把供应商元数据转换为可保存草稿：比例、质量取核心支持的枚举交集；图片输入/输出上限限制在核心范围内；未声明的能力保守保留自动档与单张输出。必填参考图、仅矢量输出或不接受单张生成的供应商会带 `unavailableReason`，页面禁止添加。质量仍映射到 `quality`，不会把像素 `resolution` 推断成质量档。OpenRouter adapter v2 直接发送 `aspect_ratio`，避免用固定像素 `size` 错误限制目录中的横竖比例。
 
 图片设置仅在提交进行中禁用保存按钮；其它缺项在按钮旁显示并在点击时提示，拦截非法请求。完全相同的旧模型定义在前端草稿中合并，空白的新增凭据行不参与校验；保存才会修改文件。
+
+## 网络搜索设置
+
+`GET /api/web-search/config` 返回文件 `revision`、当前配置投影（`enabled`、`vendor`、`base_url`、`api_key_configured`、`count`、`timeout_seconds`）与 `vendors` 列表（id、label、默认地址、是否必须手填地址）。列表来自 `SEARCH_VENDOR_IDS` / `SEARCH_VENDORS`，与配置校验同源，因此表单不会出现运行时会拒绝的厂商；`needs_base_url` 让页面在 SearXNG 缺地址时直接禁用保存。
+
+`PUT /api/web-search/config` 接受部分字段；`api_key` 明文只写入 key jar，响应与页面都不回显，`api_key_configured` 只报布尔值。空 body 或全部未变化时幂等成功，不重写文件。写入经 reloader 原子应用：`web_search` 是热更新，运行中的 Invocation 在下一次搜索请求读取新值；Invocation 开始时可用、中途被停用的调用返回 `search_disabled`。启用开关旁的提示说明 Skill 索引参与稳定 system prompt 哈希，切换会重建受影响的 Conversation Context。
+
+页面不做「测试连接」：每次真实搜索都会按厂商计费。

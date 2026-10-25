@@ -11,6 +11,7 @@ import { prompts } from './pages/prompts.ts';
 import { stickers } from './pages/stickers.ts';
 import { telegram } from './pages/telegram.ts';
 import { warnings } from './pages/warnings.ts';
+import { webSearch } from './pages/web-search.ts';
 
 /**
  * Audit and configuration pages: overview, auth, chats, stickers, memories,
@@ -31,4 +32,5 @@ export const pages = {
   preferences,
   telegram,
   warnings,
+  webSearch,
 };

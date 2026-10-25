@@ -236,6 +236,7 @@ pnpm run admin:test:e2e     # Playwright 套件（apps/admin-next/e2e/**/*.e2e.t
 pnpm run admin:test:e2e 08-models 16-model-health  # 模型管理与健康检查回归
 pnpm run admin:test:e2e 17-dictionary 18-tool-model  # 辞典页与 Tool Model 回归
 pnpm run admin:test:e2e 20-playground  # Playground 房间 API 与页面回归
+pnpm run admin:test:e2e 22-web-search-settings  # 网络搜索设置页、密钥不回显与缺地址写前拒绝
 ```
 
 `20-playground.e2e.ts` 用真实 `AdminServer` + 房间写入路径驱动：Session-only 与 API key 拒绝、请求 key 幂等建房、房间之间的 ID 隔离、上传校验与内容读取（页面部分随 Playground 页面一并断言）。夹具 `e2e/server.ts` 在仿真数据里额外建两个房间并放入一条 held 消息，规格通过 `GET /__e2e/playground-seed` 取用它们的 ID，不依赖自增主键。

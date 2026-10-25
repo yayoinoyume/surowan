@@ -1,0 +1,30 @@
+export const webSearch = {
+  title: 'Web search',
+  description:
+    'Give the agent a search capability through one vendor. The tool returns titles, URLs and snippets; the agent reads a page with web_fetch when it needs the full text.',
+  enable: 'Enable web search',
+  enableDescription:
+    'Turning this off removes the tool from new runs and hides the skill. A run that already started answers search_disabled instead of searching.',
+  contextNote:
+    'The skill index is part of the stable system prompt, so switching this on or off rebuilds the Conversation Context of every affected chat on its next run.',
+  vendor: 'Vendor',
+  vendorDescription: 'One vendor at a time. A vendor without a public address requires a base URL.',
+  vendorPlaceholder: 'Choose a vendor',
+  baseUrl: 'Base URL',
+  baseUrlDescription: 'Optional override. Leave empty to use the vendor default; SearXNG requires it.',
+  apiKey: 'API key',
+  apiKeyConfigured: 'A key is configured. It is stored as a reference and never shown again.',
+  apiKeyMissing: 'No key is configured.',
+  apiKeyPlaceholder: 'Leave empty to keep the current key',
+  apiKeyDescription: 'A new value replaces the stored key; it is written to the key jar, not to config.jsonc.',
+  clearApiKey: 'Clear the stored key',
+  count: 'Results',
+  countDescription: 'Default number of results, 1–10. The agent may ask for fewer or more.',
+  timeout: 'Timeout (seconds)',
+  timeoutDescription: 'Per-request limit, 5–30. The remaining invocation time still wins.',
+  save: 'Save',
+  saving: 'Saving…',
+  vendorRequired: 'Choose a valid vendor.',
+  baseUrlRequired: 'This vendor requires a base URL.',
+  loadFailed: 'Cannot load web search settings',
+};

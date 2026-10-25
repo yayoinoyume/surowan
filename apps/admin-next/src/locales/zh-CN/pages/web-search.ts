@@ -1,0 +1,30 @@
+export const webSearch = {
+  title: '网络搜索',
+  description:
+    '通过一家厂商给 Agent 提供搜索能力。工具只返回标题、URL 与摘要；需要正文时由 Agent 用 web_fetch 读取页面。',
+  enable: '启用网络搜索',
+  enableDescription:
+    '关闭后新运行不再注册该工具，Skill 同时隐藏；已经开始的运行会返回 search_disabled，而不是发起搜索。',
+  contextNote:
+    'Skill 索引属于稳定 system prompt，启用或停用会让每个受影响的会话在下一次运行时重建 Conversation Context。',
+  vendor: '厂商',
+  vendorDescription: '一次只接一家。没有公开地址的厂商必须填写 Base URL。',
+  vendorPlaceholder: '选择厂商',
+  baseUrl: 'Base URL',
+  baseUrlDescription: '可选覆盖。留空使用厂商默认地址；SearXNG 必须填写。',
+  apiKey: 'API Key',
+  apiKeyConfigured: '已配置密钥。它以引用形式保存，不会再次显示。',
+  apiKeyMissing: '未配置密钥。',
+  apiKeyPlaceholder: '留空表示保持现有密钥',
+  apiKeyDescription: '填写新值会替换已保存的密钥；它写入 key.json，不进入 config.jsonc。',
+  clearApiKey: '清除已保存的密钥',
+  count: '结果条数',
+  countDescription: '默认返回条数，1–10。Agent 可在单次调用里调整。',
+  timeout: '超时（秒）',
+  timeoutDescription: '单次请求上限，5–30。Invocation 剩余时间仍然优先。',
+  save: '保存',
+  saving: '保存中…',
+  vendorRequired: '请选择有效的厂商。',
+  baseUrlRequired: '该厂商必须填写 Base URL。',
+  loadFailed: '无法加载网络搜索设置',
+};

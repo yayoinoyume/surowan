@@ -2,7 +2,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { applyFeedback } from './model-manager.ts';
-import { chatsQuery, configStatusQuery, developerQuery, harnessQuery, providersQuery } from './queries.ts';
+import {
+  chatsQuery,
+  configStatusQuery,
+  developerQuery,
+  harnessQuery,
+  providersQuery,
+  webSearchQuery,
+} from './queries.ts';
 import type { ModelApplySummary } from './api/models.ts';
 
 export interface ProviderWriteFeedback {
@@ -25,6 +32,7 @@ export function useProviderWrite(): ProviderWriteFeedback {
     void queryClient.invalidateQueries({ queryKey: configStatusQuery.queryKey });
     void queryClient.invalidateQueries({ queryKey: developerQuery.queryKey });
     void queryClient.invalidateQueries({ queryKey: harnessQuery.queryKey });
+    void queryClient.invalidateQueries({ queryKey: webSearchQuery.queryKey });
   };
   return {
     refresh,

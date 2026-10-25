@@ -12,6 +12,7 @@ import { prompts } from './pages/prompts.ts';
 import { stickers } from './pages/stickers.ts';
 import { telegram } from './pages/telegram.ts';
 import { warnings } from './pages/warnings.ts';
+import { webSearch } from './pages/web-search.ts';
 
 /** Mirrors `en/pages.ts` key for key; the annotation fails the build on drift. */
 export const pages: typeof pagesEn = {
@@ -28,4 +29,5 @@ export const pages: typeof pagesEn = {
   preferences,
   telegram,
   warnings,
+  webSearch,
 };

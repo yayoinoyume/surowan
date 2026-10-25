@@ -32,6 +32,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StickersRouteImport } from './routes/stickers'
 import { Route as TelegramRouteImport } from './routes/telegram'
 import { Route as WarningsRouteImport } from './routes/warnings'
+import { Route as WebSearchSettingsRouteImport } from './routes/web-search-settings'
 import { Route as ContextsConversationIdRouteImport } from './routes/contexts_.$conversationId'
 import { Route as ImageGenerationsGenerationIdRouteImport } from './routes/image-generations_.$generationId'
 import { Route as InvocationsInvocationIdRouteImport } from './routes/invocations_.$invocationId'
@@ -152,6 +153,11 @@ const WarningsRoute = WarningsRouteImport.update({
   path: '/warnings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WebSearchSettingsRoute = WebSearchSettingsRouteImport.update({
+  id: '/web-search-settings',
+  path: '/web-search-settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContextsConversationIdRoute = ContextsConversationIdRouteImport.update({
   id: '/contexts_/$conversationId',
   path: '/contexts/$conversationId',
@@ -198,6 +204,7 @@ export interface FileRoutesByFullPath {
   '/stickers': typeof StickersRoute
   '/telegram': typeof TelegramRoute
   '/warnings': typeof WarningsRoute
+  '/web-search-settings': typeof WebSearchSettingsRoute
   '/contexts/$conversationId': typeof ContextsConversationIdRoute
   '/image-generations/$generationId': typeof ImageGenerationsGenerationIdRoute
   '/invocations/$invocationId': typeof InvocationsInvocationIdRoute
@@ -227,6 +234,7 @@ export interface FileRoutesByTo {
   '/stickers': typeof StickersRoute
   '/telegram': typeof TelegramRoute
   '/warnings': typeof WarningsRoute
+  '/web-search-settings': typeof WebSearchSettingsRoute
   '/contexts/$conversationId': typeof ContextsConversationIdRoute
   '/image-generations/$generationId': typeof ImageGenerationsGenerationIdRoute
   '/invocations/$invocationId': typeof InvocationsInvocationIdRoute
@@ -257,6 +265,7 @@ export interface FileRoutesById {
   '/stickers': typeof StickersRoute
   '/telegram': typeof TelegramRoute
   '/warnings': typeof WarningsRoute
+  '/web-search-settings': typeof WebSearchSettingsRoute
   '/contexts_/$conversationId': typeof ContextsConversationIdRoute
   '/image-generations_/$generationId': typeof ImageGenerationsGenerationIdRoute
   '/invocations_/$invocationId': typeof InvocationsInvocationIdRoute
@@ -288,6 +297,7 @@ export interface FileRouteTypes {
     | '/stickers'
     | '/telegram'
     | '/warnings'
+    | '/web-search-settings'
     | '/contexts/$conversationId'
     | '/image-generations/$generationId'
     | '/invocations/$invocationId'
@@ -317,6 +327,7 @@ export interface FileRouteTypes {
     | '/stickers'
     | '/telegram'
     | '/warnings'
+    | '/web-search-settings'
     | '/contexts/$conversationId'
     | '/image-generations/$generationId'
     | '/invocations/$invocationId'
@@ -346,6 +357,7 @@ export interface FileRouteTypes {
     | '/stickers'
     | '/telegram'
     | '/warnings'
+    | '/web-search-settings'
     | '/contexts_/$conversationId'
     | '/image-generations_/$generationId'
     | '/invocations_/$invocationId'
@@ -376,6 +388,7 @@ export interface RootRouteChildren {
   StickersRoute: typeof StickersRoute
   TelegramRoute: typeof TelegramRoute
   WarningsRoute: typeof WarningsRoute
+  WebSearchSettingsRoute: typeof WebSearchSettingsRoute
   ContextsConversationIdRoute: typeof ContextsConversationIdRoute
   ImageGenerationsGenerationIdRoute: typeof ImageGenerationsGenerationIdRoute
   InvocationsInvocationIdRoute: typeof InvocationsInvocationIdRoute
@@ -545,6 +558,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WarningsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/web-search-settings': {
+      id: '/web-search-settings'
+      path: '/web-search-settings'
+      fullPath: '/web-search-settings'
+      preLoaderRoute: typeof WebSearchSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/contexts_/$conversationId': {
       id: '/contexts_/$conversationId'
       path: '/contexts/$conversationId'
@@ -600,6 +620,7 @@ const rootRouteChildren: RootRouteChildren = {
   StickersRoute: StickersRoute,
   TelegramRoute: TelegramRoute,
   WarningsRoute: WarningsRoute,
+  WebSearchSettingsRoute: WebSearchSettingsRoute,
   ContextsConversationIdRoute: ContextsConversationIdRoute,
   ImageGenerationsGenerationIdRoute: ImageGenerationsGenerationIdRoute,
   InvocationsInvocationIdRoute: InvocationsInvocationIdRoute,

@@ -23,6 +23,7 @@ import { createPlaygroundAdminRoutes } from './playground-route-admin.ts';
 import { createPromptsAdminHandler } from './prompts-route-admin.ts';
 import { createProvidersAdminHandler } from './providers-route-admin.ts';
 import { createTelegramAdminHandler } from './telegram-admin.ts';
+import { createWebSearchAdminHandler } from './web-search-admin.ts';
 import { createTuningAdminHandler } from './tuning-admin-routes.ts';
 import { createWarningsAdminHandler } from './warnings-admin.ts';
 import type { AdminServerOptions } from './server.ts';
@@ -127,6 +128,7 @@ export function createAdminRoutes(deps: AdminRoutesDeps) {
     playground: createPlaygroundAdminRoutes({ playground, scheduler }),
     image: createImageAdminRoutes({ image, bridge: imageBridge, configReloader: reloader, secrets }),
     telegram: createTelegramAdminHandler({ connections, configReloader: reloader, secrets }),
+    webSearch: createWebSearchAdminHandler({ configReloader: reloader, secrets }),
     inspection: createInspectionAdminHandler({
       store: options.store,
       configStore: options.configStore,

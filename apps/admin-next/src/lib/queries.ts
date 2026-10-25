@@ -23,6 +23,7 @@ import { listApiKeys, listBotAdmins } from './api/admin.ts';
 import { listMemories, listMemoryChats } from './api/memories.ts';
 import { listStickerSets, listStickers } from './api/stickers.ts';
 import { getTelegram } from './api/telegram.ts';
+import { getWebSearchConfig } from './api/web-search.ts';
 import { listWarnings } from './api/warnings.ts';
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 
@@ -173,6 +174,12 @@ export const configStatusQuery = queryOptions({
 export const developerQuery = queryOptions({
   queryKey: ['developer'],
   queryFn: getDeveloperSettings,
+  staleTime: 0,
+});
+
+export const webSearchQuery = queryOptions({
+  queryKey: ['web-search'],
+  queryFn: getWebSearchConfig,
   staleTime: 0,
 });
 

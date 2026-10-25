@@ -251,6 +251,7 @@ export class AdminServer {
     response ??= await routes.playground.handle(request, url, segments, username);
     response ??= await routes.image.handle(request, url, segments, username);
     response ??= await routes.telegram.handle(request, segments);
+    response ??= await routes.webSearch.handle(request, segments);
     response ??= await routes.warnings.handle(request, url, segments);
     if (response !== undefined) {
       return response;
