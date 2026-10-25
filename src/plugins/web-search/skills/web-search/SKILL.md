@@ -50,6 +50,9 @@ If you are unsure about the exact input contract, run `execute` with action
 - A key that cannot be resolved is a deployment configuration problem, not a
   network error. Report it as such and do not retry; the operator has to fix
   the configuration.
+- A search can also be switched off by the operator while you are running;
+  that is a deployment state, not a network failure, and retrying will not
+  change it.
 - If the results are irrelevant, refine the query once or twice with more
   specific words; stop when they remain irrelevant and say the information
   could not be found.

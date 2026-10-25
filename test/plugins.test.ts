@@ -8,6 +8,8 @@ import { TelegramIngestion } from '../src/ingress/telegram-ingestion.ts';
 import { BucketScheduler } from '../src/orchestration/scheduler.ts';
 import { loadConfig } from '../src/adapters/local-monolith/config.ts';
 import type { RawConfig } from '../src/platform/config.ts';
+import type { InvocationContext } from '../src/platform/invocation-context.ts';
+import type { BusinessStore } from '../src/store/store.ts';
 import { SEARCH_VENDOR_IDS } from '../src/platform/search-vendors.ts';
 import { BUILTIN_PLUGINS } from '../src/plugins/builtin.ts';
 import { definePlugin, loadPlugins } from '../src/plugins/plugin.ts';
@@ -38,6 +40,31 @@ test('loadPlugins validates plugin dependencies', () => {
   expect(() =>
     loadPlugins([definePlugin({ id: 'a', requires: ['b'] }), definePlugin({ id: 'b', requires: ['a'] })]),
   ).toThrow('must load before it');
+});
+
+test('loadPlugins hands the live configuration accessor to capabilities', () => {
+  const live = { web_search: { vendor: 'tavily' } } as unknown as RawConfig;
+  let seen: RawConfig | undefined;
+  const loaded = loadPlugins(
+    [
+      definePlugin({
+        id: 'probe',
+        capabilities: ({ currentConfig }) => {
+          seen = currentConfig?.();
+          return [];
+        },
+      }),
+    ],
+    { currentConfig: () => live },
+  );
+  // A probe only reads the accessor, so a stub store and context are enough.
+  loaded.capabilities(
+    { orm: {} } as BusinessStore,
+    {} as RawConfig,
+    { invocationId: 0n, hostKind: 'telegram' } as InvocationContext,
+    0,
+  );
+  expect(seen).toBe(live);
 });
 
 test('loadPlugins validates extension points and contributions', () => {

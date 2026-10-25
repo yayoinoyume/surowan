@@ -234,6 +234,8 @@ export async function startServeServices(session: ServeContext, environment: Ser
     image: bridge,
     // Same store as providers; the jar is re-read on every resolve.
     resolveSecret: (reference) => secrets.resolve(reference),
+    // A long invocation outlives a reload; a billed tool reads this per call.
+    currentConfig: () => configStore.current().config,
   });
   const systemResources = await FileSystemResources.load(BUNDLED_SYSTEM_RESOURCES_DIR, plugins.skillDirectories);
   logEvent('system_skills_loaded', { skills: systemResources.skills.map((skill) => skill.name).join(',') });

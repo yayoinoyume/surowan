@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
+import type { RawConfig } from '../src/platform/config.ts';
 import { clipQuery, defaultSearchBase, type SearchVendorId } from '../src/platform/search-vendors.ts';
 import { BUILTIN_PLUGINS } from '../src/plugins/builtin.ts';
 import { type InvocationScope, loadPlugins } from '../src/plugins/plugin.ts';
@@ -8,7 +9,7 @@ import {
   type SearchVendorAdapter,
   SEARCH_VENDORS_POINT,
 } from '../src/plugins/web-search/vendor.ts';
-import { createWebSearchTool } from '../src/plugins/web-search/web-search.ts';
+import { createWebSearchTool, type WebSearchSettings } from '../src/plugins/web-search/web-search.ts';
 import type { ToolAudit } from '../src/store/tool-audit.ts';
 
 /** The adapters the real plugin registry assembles, used directly by the tests. */
@@ -284,6 +285,8 @@ interface ToolFixtureOptions {
   readonly timeoutMs?: number;
   readonly response?: (request: SearchRequest, signal: AbortSignal) => Promise<{ status: number; body: string }>;
   readonly apiKey?: () => Promise<string | undefined>;
+  /** Replaces the default live-configuration reader, for reload scenarios. */
+  readonly read?: () => WebSearchSettings | undefined;
 }
 
 function toolFixture(options: ToolFixtureOptions = {}) {
@@ -292,11 +295,15 @@ function toolFixture(options: ToolFixtureOptions = {}) {
   const tool = createWebSearchTool({
     audit,
     invocationDeadline: options.deadline ?? Date.now() + 30_000,
-    adapter: adapterOf(options.vendor ?? 'tavily'),
-    baseUrl: options.baseUrl ?? 'https://api.tavily.com',
-    count: options.count ?? 5,
-    ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
-    ...(options.apiKey === undefined ? {} : { apiKey: options.apiKey }),
+    read:
+      options.read ??
+      (() => ({
+        adapter: adapterOf(options.vendor ?? 'tavily'),
+        baseUrl: options.baseUrl ?? 'https://api.tavily.com',
+        count: options.count ?? 5,
+        ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+        ...(options.apiKey === undefined ? {} : { apiKey: options.apiKey }),
+      })),
     request: async (request, signal) => {
       requests.push(request);
       return (
@@ -314,6 +321,58 @@ function toolFixture(options: ToolFixtureOptions = {}) {
 }
 
 describe('web_search capability', () => {
+  test('a search after the section is turned off returns search_disabled', async () => {
+    let enabled = true;
+    const { tool, records, requests } = toolFixture({
+      read: () => (enabled ? { adapter: adapterOf('tavily'), baseUrl: 'https://api.tavily.com', count: 5 } : undefined),
+    });
+    await tool.execute('call-before', { query: 'q' });
+    enabled = false;
+    await expect(tool.execute('call-after', { query: 'q' })).rejects.toThrow('disabled');
+    // The audit records the structured reason, and nothing was sent.
+    expect(records.at(-1)?.error).toBe('search_disabled');
+    expect(requests).toHaveLength(1);
+  });
+
+  test('a search after a vendor change uses the new adapter', async () => {
+    let vendor: SearchVendorId = 'tavily';
+    const { tool, requests } = toolFixture({
+      read: () => ({
+        adapter: adapterOf(vendor),
+        baseUrl: vendor === 'tavily' ? 'https://api.tavily.com' : 'https://api.search.brave.com',
+        count: 5,
+      }),
+      response: async (request) => ({
+        status: 200,
+        body: JSON.stringify(
+          request.url.includes('brave')
+            ? { web: { results: [{ title: 'One', url: 'https://one.example/', content: 'brave snippet' }] } }
+            : { results: [{ title: 'One', url: 'https://one.example/', content: 'tavily snippet' }] },
+        ),
+      }),
+    });
+    await tool.execute('call-tavily', { query: 'q' });
+    vendor = 'brave';
+    await tool.execute('call-brave', { query: 'q' });
+    expect(requests[0]?.method).toBe('POST');
+    expect(requests[1]?.method).toBe('GET');
+    expect(requests[1]?.headers['x-subscription-token']).toBeUndefined();
+  });
+
+  test('each search reads count from the live settings', async () => {
+    let count = 2;
+    const { tool, requests } = toolFixture({
+      read: () => ({ adapter: adapterOf('tavily'), baseUrl: 'https://api.tavily.com', count }),
+    });
+    await tool.execute('call-two', { query: 'q' });
+    count = 7;
+    await tool.execute('call-seven', { query: 'q' });
+    // base_url, timeout and the key resolver share this read; count is the
+    // one observable through the request body.
+    expect(bodyOf(requests[0] as SearchRequest).max_results).toBe(2);
+    expect(bodyOf(requests[1] as SearchRequest).max_results).toBe(7);
+  });
+
   test('the tool clips the query by the vendor limit', async () => {
     const { tool, requests } = toolFixture({ vendor: 'deepseek' });
     await tool.execute('call-clip', { query: 'x'.repeat(300) });
@@ -433,6 +492,57 @@ describe('plugin registration', () => {
 
   test('contributes nothing without configuration', () => {
     expect(webSearch.capabilities?.(scopeWith(undefined))).toEqual([]);
+  });
+
+  test('the plugin re-reads the live configuration on every search', async () => {
+    const { audit } = fakeAudit();
+    let vendor: SearchVendorId = 'tavily';
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      urls.push(url);
+      const body = url.includes('brave') ? { web: { results: [] } } : { results: [] };
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+    try {
+      const scope = {
+        config: {},
+        audit,
+        deadline: Date.now() + 30_000,
+        extensions: (pointId: string) => (pointId === SEARCH_VENDORS_POINT ? adapters : new Map()),
+        currentConfig: () =>
+          ({
+            web_search: {
+              vendor,
+              base_url: vendor === 'tavily' ? 'https://api.tavily.com' : 'https://api.search.brave.com',
+            },
+          }) as unknown as RawConfig,
+      } as unknown as InvocationScope;
+      const tools = webSearch.capabilities?.(scope) ?? [];
+      await tools[0]!.tool.execute('call-tavily', { query: 'q' });
+      vendor = 'brave';
+      await tools[0]!.tool.execute('call-brave', { query: 'q' });
+      // The tool was mounted once; the second search still followed the reload.
+      expect(urls[0]).toContain('api.tavily.com');
+      expect(urls[1]).toContain('api.search.brave.com');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test('the capability mounts from the live configuration when one is provided', () => {
+    const { audit } = fakeAudit();
+    const scope = {
+      // The invocation snapshot has no section; the live configuration does.
+      config: {},
+      audit,
+      deadline: Date.now() + 30_000,
+      extensions: (pointId: string) => (pointId === SEARCH_VENDORS_POINT ? adapters : new Map()),
+      currentConfig: () => ({ web_search: { vendor: 'brave' } }),
+    } as unknown as InvocationScope;
+    expect(webSearch.capabilities?.(scope)?.map((entry) => entry.tool.name)).toEqual(['web_search']);
   });
 
   test('registers one web_search capability when configured', () => {

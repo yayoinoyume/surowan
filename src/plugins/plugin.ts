@@ -74,6 +74,13 @@ export interface InvocationScope {
   readonly resolveSecret?: (reference: SecretRef) => Promise<string>;
   /** Implementations of one extension point, keyed by contribution name. */
   readonly extensions: (pointId: string) => ReadonlyMap<string, unknown>;
+  /**
+   * The configuration the process published most recently, read at call time.
+   * A tool that bills per call uses this so a reload between two calls in one
+   * long invocation applies. Absent when the host did not wire it (tests, tools
+   * assembled outside `serve`).
+   */
+  readonly currentConfig?: () => RawConfig;
 }
 
 /** A skill directory, optionally gated on the configuration the host is using. */
@@ -128,6 +135,8 @@ export interface LoadPluginsOptions {
   readonly resolveMedia?: (ref: string) => bigint | undefined;
   /** SecretRef resolver handed to plugins (`scope.resolveSecret`); see `SecretStore`. */
   readonly resolveSecret?: (reference: SecretRef) => Promise<string>;
+  /** Live configuration accessor handed to plugins (`scope.currentConfig`). */
+  readonly currentConfig?: () => RawConfig;
 }
 
 export interface LoadedPlugins {
@@ -226,6 +235,7 @@ export function loadPlugins(plugins: readonly AgentPlugin[], options: LoadPlugin
           ...(options.image === undefined ? {} : { image: options.image }),
           ...(options.resolveSecret === undefined ? {} : { resolveSecret: options.resolveSecret }),
           extensions: (pointId) => extensionValues.get(pointId) ?? NO_EXTENSIONS,
+          ...(options.currentConfig === undefined ? {} : { currentConfig: options.currentConfig }),
         };
         return plugin.capabilities?.(scope) ?? [];
       });
