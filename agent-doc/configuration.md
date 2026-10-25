@@ -618,7 +618,7 @@ Streamable HTTP 使用 `url` 与可选 SecretRef `headers`，且 `follow_redirec
 - `api_key` 为 SecretRef，可复用模型 Provider 用的同一个 `key.json` 条目；`searxng` 不需要，`you` 可省略（走免费端点，有每日次数限制）。
 - `count` 为默认结果条数，1–10，缺省 5；模型可在单次调用里用 `count` 覆盖。
 - `timeout_seconds` 为单次请求上限，5–30，缺省 15，且不会超过 Invocation 剩余时间。
-- `web_search` 整段是热更新：应用配置后，下一次 Invocation 使用新值，运行中的 Invocation 继续用启动时的快照。切换开关不需要重启。
+- `web_search` 整段是热更新，且粒度是**每次搜索请求**：应用配置后，下一次调用就用新值，运行中的 Invocation 不必结束。Invocation 开始时没有可用配置则工具根本不挂载；开始时有、之后被停用则工具仍在，调用返回 `search_disabled`，不发网络请求。
 
 | `vendor` | 默认地址 | 需要 key | 说明 |
 | --- | --- | --- | --- |
