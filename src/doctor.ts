@@ -68,7 +68,7 @@ async function runDoctorChecks(
   outputAgentPrompt: boolean,
 ): Promise<void> {
   const telegram = await resolveDoctorTelegram(config, secrets);
-  await resolveAllSecrets(config.providers, config.mcp?.servers ?? [], secrets);
+  await resolveAllSecrets(config.providers, config.mcp?.servers ?? [], config.web_search, secrets);
   const registry = await buildModelRegistry(config, null, secrets);
   const configStore = new RuntimeConfigurationStore({ config, hash: configHash, ...registry });
   await mkdir(config.data_dir, { recursive: true, mode: 0o700 });
@@ -362,8 +362,12 @@ export async function resolveDoctorTelegram(config: RawConfig, secrets: SecretSt
 async function resolveAllSecrets(
   providers: Readonly<Record<string, ProviderConfig>>,
   servers: readonly McpServerConfig[],
+  webSearch: RawConfig['web_search'],
   secrets: SecretStore,
 ): Promise<void> {
+  if (webSearch?.api_key !== undefined) {
+    await secrets.resolve(webSearch.api_key);
+  }
   for (const provider of Object.values(providers)) {
     await secrets.resolve(provider.api_key);
     if (provider.kind === 'custom') {
