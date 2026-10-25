@@ -7,6 +7,7 @@ import type { ContextInjectionInput, ContextInjector } from '../src/context/cont
 import { TelegramIngestion } from '../src/ingress/telegram-ingestion.ts';
 import { BucketScheduler } from '../src/orchestration/scheduler.ts';
 import { loadConfig } from '../src/adapters/local-monolith/config.ts';
+import type { RawConfig } from '../src/platform/config.ts';
 import { BUILTIN_PLUGINS } from '../src/plugins/builtin.ts';
 import { definePlugin, loadPlugins } from '../src/plugins/plugin.ts';
 import { SqliteStore } from '../src/adapters/local-monolith/database.ts';
@@ -17,6 +18,74 @@ test('loadPlugins rejects invalid and duplicate plugin ids', () => {
   expect(() => loadPlugins([definePlugin({ id: 'twin' }), definePlugin({ id: 'twin' })])).toThrow(
     'Duplicate plugin id: twin',
   );
+});
+
+test('loadPlugins validates plugin dependencies', () => {
+  expect(() => loadPlugins([definePlugin({ id: 'a', requires: ['missing'] })])).toThrow(
+    'Plugin a requires unknown plugin: missing',
+  );
+  expect(() => loadPlugins([definePlugin({ id: 'a' }), definePlugin({ id: 'b', requires: ['a'] })])).not.toThrow();
+  // Ordering also rejects cycles, so no separate graph walk is needed.
+  expect(() => loadPlugins([definePlugin({ id: 'a', requires: ['b'] }), definePlugin({ id: 'b' })])).toThrow(
+    'Plugin a requires b, which must load before it',
+  );
+  expect(() => loadPlugins([definePlugin({ id: 'a', requires: ['a'] })])).toThrow(
+    'Plugin a requires a, which must load before it',
+  );
+  // A cycle always contains an edge pointing forward, so ordering rejects it.
+  expect(() =>
+    loadPlugins([definePlugin({ id: 'a', requires: ['b'] }), definePlugin({ id: 'b', requires: ['a'] })]),
+  ).toThrow('must load before it');
+});
+
+test('loadPlugins validates extension points and contributions', () => {
+  const owner = definePlugin({ id: 'owner', provides: ['owner.items'] });
+  expect(() => loadPlugins([definePlugin({ id: 'x', provides: ['other.items'] })])).toThrow('outside its id');
+  expect(() => loadPlugins([owner, definePlugin({ id: 'x', contributes: { 'owner.items': { a: 1 } } })])).toThrow(
+    'without requiring owner',
+  );
+  expect(() =>
+    loadPlugins([owner, definePlugin({ id: 'x', requires: ['owner'], contributes: { 'owner.missing': { a: 1 } } })]),
+  ).toThrow('undeclared extension point: owner.missing');
+  const loaded = loadPlugins([
+    owner,
+    definePlugin({ id: 'x', requires: ['owner'], contributes: { 'owner.items': { a: { value: 1 } } } }),
+  ]);
+  expect(loaded.extensions('owner.items').get('a')).toEqual({ value: 1 });
+  expect(loaded.extensions('owner.none').size).toBe(0);
+  expect(() =>
+    loadPlugins([
+      owner,
+      definePlugin({ id: 'x', requires: ['owner'], contributes: { 'owner.items': { a: 1 } } }),
+      definePlugin({ id: 'y', requires: ['owner'], contributes: { 'owner.items': { a: 2 } } }),
+    ]),
+  ).toThrow('Duplicate contribution a for extension point owner.items');
+});
+
+test('a plugin skill gates its own visibility on the configuration', () => {
+  const loaded = loadPlugins([
+    definePlugin({
+      id: 'gated',
+      skills: [{ directory: '/skills/gated', visible: (config) => config.web_search !== undefined }],
+    }),
+    definePlugin({ id: 'plain', skills: ['/skills/plain'] }),
+  ]);
+  expect(loaded.skillVisible('gated', {} as RawConfig)).toBe(false);
+  expect(loaded.skillVisible('gated', { web_search: {} } as RawConfig)).toBe(true);
+  // A skill without a declared condition stays visible.
+  expect(loaded.skillVisible('plain', {} as RawConfig)).toBe(true);
+  expect(loaded.skillVisible('absent', {} as RawConfig)).toBe(true);
+});
+
+test('the web-search skill is hidden until a vendor is configured', () => {
+  const loaded = loadPlugins(BUILTIN_PLUGINS);
+  expect(loaded.skillVisible('web-search', {} as RawConfig)).toBe(false);
+  expect(loaded.skillVisible('web-search', { web_search: { vendor: 'tavily' } } as unknown as RawConfig)).toBe(true);
+  expect(
+    loaded.skillVisible('web-search', {
+      web_search: { enabled: false, vendor: 'tavily' },
+    } as unknown as RawConfig),
+  ).toBe(false);
 });
 
 test('built-in plugins load with unique ids and their skill directories', () => {

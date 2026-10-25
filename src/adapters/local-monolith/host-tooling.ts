@@ -70,12 +70,11 @@ export function createHostTooling(options: HostToolingOptions): HostTooling {
     if (hosts !== undefined && !hosts.includes(target.hostKind)) {
       return false;
     }
-    // Never advertise a capability that is not registered.
-    if (skill.name === 'web-search') {
-      const settings = configStore.current().config.web_search;
-      if (settings === undefined || settings.enabled === false) {
-        return false;
-      }
+    // A plugin gates its own skill on the configuration it runs under; session
+    // state (image generation per conversation) has no plugin equivalent and
+    // stays here.
+    if (!plugins.skillVisible(skill.name, configStore.current().config)) {
+      return false;
     }
     return skill.name !== 'image-generation' || (imageBridge?.enabledFor(target.conversationId) ?? false);
   };

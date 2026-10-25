@@ -1,18 +1,31 @@
 import { join } from 'node:path';
 import { capability } from '../../capabilities/execute-tool.ts';
+import type { RawConfig } from '../../platform/config.ts';
 import { defaultSearchBase } from '../../platform/search-vendors.ts';
 import { definePlugin } from '../plugin.ts';
 import { createWebSearchTool } from './web-search.ts';
+
+/** The section as enabled configuration; `undefined` when the switch is off. */
+function webSearchSettings(config: RawConfig): NonNullable<RawConfig['web_search']> | undefined {
+  const settings = config.web_search;
+  return settings === undefined || settings.enabled === false ? undefined : settings;
+}
 
 /** One configured vendor behind `execute.call`; off unless `web_search` is set. */
 export default definePlugin({
   id: 'web-search',
   // Read-only network access is part of the Playground's fixed capability set.
   hosts: ['telegram', 'playground'],
-  skills: [join(import.meta.dirname, 'skills', 'web-search')],
+  skills: [
+    {
+      directory: join(import.meta.dirname, 'skills', 'web-search'),
+      // The same conditions that decide whether the capability exists.
+      visible: (config) => webSearchSettings(config)?.vendor !== undefined,
+    },
+  ],
   capabilities: ({ audit, config, deadline, resolveSecret }) => {
-    const settings = config.web_search;
-    if (settings === undefined || settings.enabled === false) {
+    const settings = webSearchSettings(config);
+    if (settings === undefined) {
       return [];
     }
     const vendor = settings.vendor;
