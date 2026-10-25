@@ -3,6 +3,7 @@ import { capability } from '../../capabilities/execute-tool.ts';
 import type { RawConfig } from '../../platform/config.ts';
 import { defaultSearchBase } from '../../platform/search-vendors.ts';
 import { definePlugin } from '../plugin.ts';
+import { SEARCH_VENDORS_POINT, type SearchVendorAdapter } from './vendor.ts';
 import { createWebSearchTool } from './web-search.ts';
 
 /** The section as enabled configuration; `undefined` when the switch is off. */
@@ -16,6 +17,8 @@ export default definePlugin({
   id: 'web-search',
   // Read-only network access is part of the Playground's fixed capability set.
   hosts: ['telegram', 'playground'],
+  // Vendor plugins contribute their adapters here; this plugin owns the point.
+  provides: [SEARCH_VENDORS_POINT],
   skills: [
     {
       directory: join(import.meta.dirname, 'skills', 'web-search'),
@@ -23,13 +26,17 @@ export default definePlugin({
       visible: (config) => webSearchSettings(config)?.vendor !== undefined,
     },
   ],
-  capabilities: ({ audit, config, deadline, resolveSecret }) => {
+  capabilities: ({ audit, config, deadline, resolveSecret, extensions }) => {
     const settings = webSearchSettings(config);
     if (settings === undefined) {
       return [];
     }
     const vendor = settings.vendor;
     if (vendor === undefined) {
+      return [];
+    }
+    const adapter = extensions(SEARCH_VENDORS_POINT).get(vendor) as SearchVendorAdapter | undefined;
+    if (adapter === undefined) {
       return [];
     }
     const baseUrl = settings.base_url ?? defaultSearchBase(vendor, settings.api_key !== undefined);
@@ -39,7 +46,7 @@ export default definePlugin({
         createWebSearchTool({
           audit,
           invocationDeadline: deadline,
-          vendor,
+          adapter,
           baseUrl,
           count: settings.count ?? 5,
           ...(settings.timeout_seconds === undefined ? {} : { timeoutMs: settings.timeout_seconds * 1_000 }),

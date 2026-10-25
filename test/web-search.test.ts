@@ -1,15 +1,44 @@
 import { describe, expect, test } from 'vitest';
-import {
-  buildSearchRequest,
-  defaultSearchBase,
-  readSearchReply,
-  type SearchRequest,
-  type SearchVendorId,
-} from '../src/platform/search-vendors.ts';
-import type { InvocationScope } from '../src/plugins/plugin.ts';
+import { clipQuery, defaultSearchBase, type SearchVendorId } from '../src/platform/search-vendors.ts';
+import { BUILTIN_PLUGINS } from '../src/plugins/builtin.ts';
+import { type InvocationScope, loadPlugins } from '../src/plugins/plugin.ts';
 import webSearch from '../src/plugins/web-search/index.ts';
+import {
+  type SearchRequest,
+  type SearchVendorAdapter,
+  SEARCH_VENDORS_POINT,
+} from '../src/plugins/web-search/vendor.ts';
 import { createWebSearchTool } from '../src/plugins/web-search/web-search.ts';
 import type { ToolAudit } from '../src/store/tool-audit.ts';
+
+/** The adapters the real plugin registry assembles, used directly by the tests. */
+const adapters = loadPlugins(BUILTIN_PLUGINS).extensions(SEARCH_VENDORS_POINT) as ReadonlyMap<
+  string,
+  SearchVendorAdapter
+>;
+
+function adapterOf(vendor: SearchVendorId): SearchVendorAdapter {
+  const adapter = adapters.get(vendor);
+  if (adapter === undefined) {
+    throw new Error(`no adapter registered for ${vendor}`);
+  }
+  return adapter;
+}
+
+/** Mirrors the production call: clip by vendor, then build. */
+function buildSearchRequest(
+  vendor: SearchVendorId,
+  baseUrl: string,
+  key: string | undefined,
+  query: string,
+  count: number,
+): SearchRequest {
+  return adapterOf(vendor).buildRequest({ baseUrl, key, query: clipQuery(vendor, query), count });
+}
+
+function readSearchReply(vendor: SearchVendorId, body: string) {
+  return adapterOf(vendor).readReply(body);
+}
 
 interface AuditRecord {
   readonly tool: string;
@@ -263,7 +292,7 @@ function toolFixture(options: ToolFixtureOptions = {}) {
   const tool = createWebSearchTool({
     audit,
     invocationDeadline: options.deadline ?? Date.now() + 30_000,
-    vendor: options.vendor ?? 'tavily',
+    adapter: adapterOf(options.vendor ?? 'tavily'),
     baseUrl: options.baseUrl ?? 'https://api.tavily.com',
     count: options.count ?? 5,
     ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
@@ -285,6 +314,13 @@ function toolFixture(options: ToolFixtureOptions = {}) {
 }
 
 describe('web_search capability', () => {
+  test('the tool clips the query by the vendor limit', async () => {
+    const { tool, requests } = toolFixture({ vendor: 'deepseek' });
+    await tool.execute('call-clip', { query: 'x'.repeat(300) });
+    // The production path, not only the test helper, applies the clip.
+    expect(bodyOf(requests[0] as SearchRequest).query).toHaveLength(128);
+  });
+
   test('renders ranked hits with their URLs', async () => {
     const { tool, records } = toolFixture();
     const result = await tool.execute('call-1', { query: 'hello' });
@@ -391,6 +427,7 @@ describe('plugin registration', () => {
       config: { web_search: webSearchConfig },
       audit,
       deadline: Date.now() + 30_000,
+      extensions: (pointId: string) => (pointId === SEARCH_VENDORS_POINT ? adapters : new Map()),
     } as unknown as InvocationScope;
   }
 
@@ -402,6 +439,20 @@ describe('plugin registration', () => {
     const tools = webSearch.capabilities?.(scopeWith({ vendor: 'tavily', api_key: { env: 'TAVILY_KEY' } })) ?? [];
     expect(tools.map((entry) => entry.tool.name)).toEqual(['web_search']);
     expect(tools[0]?.sideEffect).toBe(false);
+  });
+
+  test('a vendor with no registered adapter contributes nothing', () => {
+    // A missing vendor plugin must not leave a skill that advertises a tool
+    // which does not exist; the run simply has no web_search.
+    const withoutYou = loadPlugins(BUILTIN_PLUGINS.filter((plugin) => plugin.id !== 'web-search-you'));
+    const { audit } = fakeAudit();
+    const scope = {
+      config: { web_search: { vendor: 'you' } },
+      audit,
+      deadline: Date.now() + 30_000,
+      extensions: (pointId: string) => withoutYou.extensions(pointId),
+    } as unknown as InvocationScope;
+    expect(webSearch.capabilities?.(scope)).toEqual([]);
   });
 
   test('an explicitly disabled section registers nothing', () => {
@@ -419,6 +470,7 @@ describe('plugin registration', () => {
       config: { web_search: { vendor: 'tavily', api_key: { env: 'MISSING_KEY' } } },
       audit,
       deadline: Date.now() + 30_000,
+      extensions: (pointId: string) => (pointId === SEARCH_VENDORS_POINT ? adapters : new Map()),
       resolveSecret: async () => {
         throw new Error('missing jar entry');
       },

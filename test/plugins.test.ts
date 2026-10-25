@@ -8,8 +8,10 @@ import { TelegramIngestion } from '../src/ingress/telegram-ingestion.ts';
 import { BucketScheduler } from '../src/orchestration/scheduler.ts';
 import { loadConfig } from '../src/adapters/local-monolith/config.ts';
 import type { RawConfig } from '../src/platform/config.ts';
+import { SEARCH_VENDOR_IDS } from '../src/platform/search-vendors.ts';
 import { BUILTIN_PLUGINS } from '../src/plugins/builtin.ts';
 import { definePlugin, loadPlugins } from '../src/plugins/plugin.ts';
+import { SEARCH_VENDORS_POINT, type SearchVendorAdapter } from '../src/plugins/web-search/vendor.ts';
 import { SqliteStore } from '../src/adapters/local-monolith/database.ts';
 import { renderInvocationContext, testConfigStore, writeTestConfig } from './helpers.ts';
 
@@ -86,6 +88,15 @@ test('the web-search skill is hidden until a vendor is configured', () => {
       web_search: { enabled: false, vendor: 'tavily' },
     } as unknown as RawConfig),
   ).toBe(false);
+});
+
+test('built-in vendor plugins cover every configured vendor id', () => {
+  const loaded = loadPlugins(BUILTIN_PLUGINS);
+  const adapters = loaded.extensions(SEARCH_VENDORS_POINT);
+  expect([...adapters.keys()].sort()).toEqual([...SEARCH_VENDOR_IDS].sort());
+  for (const id of SEARCH_VENDOR_IDS) {
+    expect((adapters.get(id) as SearchVendorAdapter | undefined)?.id).toBe(id);
+  }
 });
 
 test('built-in plugins load with unique ids and their skill directories', () => {

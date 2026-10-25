@@ -15,6 +15,7 @@ import {
   ToolModelSchema,
   VisionSectionSchema,
 } from './config-schema-sections.ts';
+import { SEARCH_VENDOR_IDS } from './search-vendors.ts';
 
 /**
  * The remaining file sections — sticker sets, tool policies, MCP servers, admin
@@ -215,19 +216,9 @@ export const ConfigSchema = Type.Object(
           // Omitted means on; `false` pauses a billed capability without losing it.
           enabled: Type.Optional(Type.Boolean()),
           // Required unless `enabled` is false: a disabled section may be a
-          // placeholder that the operator fills in later. Kept literal so the
-          // static type is the union, not `string`.
-          vendor: Type.Optional(
-            Type.Union([
-              Type.Literal('tavily'),
-              Type.Literal('brave'),
-              Type.Literal('exa'),
-              Type.Literal('firecrawl'),
-              Type.Literal('deepseek'),
-              Type.Literal('searxng'),
-              Type.Literal('you'),
-            ]),
-          ),
+          // placeholder that the operator fills in later. Derived from the
+          // vendor registry so a new vendor never leaves this union behind.
+          vendor: Type.Optional(Type.Enum(SEARCH_VENDOR_IDS)),
           // Optional for every vendor with a public address; SearXNG requires it.
           base_url: Type.Optional(Type.String({ minLength: 1, maxLength: 2_048 })),
           // Required by every vendor but SearXNG and You.com's keyless tier.

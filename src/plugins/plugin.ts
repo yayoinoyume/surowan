@@ -72,6 +72,8 @@ export interface InvocationScope {
   readonly image?: ImagePluginBridge;
   /** Resolves a SecretRef through the deployment's key jar, env or command. */
   readonly resolveSecret?: (reference: SecretRef) => Promise<string>;
+  /** Implementations of one extension point, keyed by contribution name. */
+  readonly extensions: (pointId: string) => ReadonlyMap<string, unknown>;
 }
 
 /** A skill directory, optionally gated on the configuration the host is using. */
@@ -223,6 +225,7 @@ export function loadPlugins(plugins: readonly AgentPlugin[], options: LoadPlugin
           ...(resolveMedia === undefined ? {} : { resolveMedia }),
           ...(options.image === undefined ? {} : { image: options.image }),
           ...(options.resolveSecret === undefined ? {} : { resolveSecret: options.resolveSecret }),
+          extensions: (pointId) => extensionValues.get(pointId) ?? NO_EXTENSIONS,
         };
         return plugin.capabilities?.(scope) ?? [];
       });

@@ -17,6 +17,7 @@ export function exampleSource(name: (typeof exampleNames)[number]): string {
 interface SchemaNode {
   type?: string;
   const?: unknown;
+  enum?: readonly unknown[];
   anyOf?: SchemaNode[];
   properties?: Record<string, SchemaNode>;
   patternProperties?: Record<string, SchemaNode>;
@@ -35,6 +36,9 @@ interface SchemaNode {
 function typeLabel(schema: SchemaNode): string {
   if ('const' in schema) {
     return JSON.stringify(schema.const);
+  }
+  if (schema.enum !== undefined) {
+    return schema.enum.map((value) => JSON.stringify(value)).join(' / ');
   }
   if (schema.anyOf) {
     return schema.anyOf.map(typeLabel).join(' / ');

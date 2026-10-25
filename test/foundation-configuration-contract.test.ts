@@ -66,6 +66,8 @@ describe('configuration', () => {
       );
       return loadConfig(configPath);
     };
+    // A vendor with no registered plugin is rejected by the schema itself.
+    await expect(reload({ vendor: 'unknown', api_key: { env: 'UNKNOWN_KEY' } })).rejects.toThrow('Invalid config');
     // A vendor that needs a key cannot be configured without one.
     await expect(reload({ vendor: 'tavily' })).rejects.toThrow('web_search.api_key is required');
     // SearXNG has no public address, so the deployment must name its instance.

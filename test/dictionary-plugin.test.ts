@@ -59,6 +59,7 @@ test('the plugin contributes its capabilities with the pre-migration side-effect
           throw new Error('not used');
         },
       },
+      extensions: () => new Map(),
     });
     if (capabilities === undefined) {
       throw new Error('Expected the dictionary plugin to contribute capabilities');
